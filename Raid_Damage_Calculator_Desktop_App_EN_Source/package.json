@@ -1,0 +1,41 @@
+{
+  "name": "raid-damage-calculator-offline",
+  "version": "1.0.0",
+  "description": "Offline desktop app for RAID damage calculation",
+  "main": "main.js",
+  "author": "OpenAI",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "build:win": "electron-builder --win portable --x64"
+  },
+  "devDependencies": {
+    "electron": "^37.2.4",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "com.thedayowl.raiddamagecalculator",
+    "productName": "RAID Damage Calculator",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "index.html"
+    ],
+    "asar": true,
+    "win": {
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "Raid_Damage_Calculator_Offline_${version}_${arch}.${ext}"
+    }
+  }
+}

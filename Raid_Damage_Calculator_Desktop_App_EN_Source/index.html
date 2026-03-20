@@ -1,0 +1,1498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RAID — offline damage calculator</title>
+  <style>
+    :root {
+      --bg: #0b1020;
+      --bg-2: #121a38;
+      --panel: #121933;
+      --panel-2: #182246;
+      --line: #28345f;
+      --text: #edf2ff;
+      --muted: #a8b3d9;
+      --accent: #73a6ff;
+      --accent-2: #8c72ff;
+      --good: #67d89a;
+      --warn: #ffb65c;
+      --danger: #ff7b7b;
+      --shadow: 0 18px 44px rgba(0,0,0,.35);
+      --radius: 18px;
+      --glow: 0 0 0 1px rgba(115,166,255,.18), 0 16px 40px rgba(20,34,80,.45);
+    }
+
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      background:
+        radial-gradient(circle at top, #111a38 0%, var(--bg) 55%),
+        linear-gradient(180deg, #0b1020, #08101d);
+      color: var(--text);
+      font-family: Inter, Segoe UI, Roboto, Arial, sans-serif;
+    }
+    body { min-height: 100vh; }
+
+    .wrap {
+      width: min(1320px, calc(100% - 24px));
+      margin: 20px auto 48px;
+    }
+
+    .hero {
+      padding: 22px;
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 26px;
+      background: linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02));
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(12px);
+      margin-bottom: 16px;
+    }
+
+    .hero-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .hero-title {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px 14px;
+      margin-bottom: 10px;
+    }
+
+    .hero-title h1 {
+      margin: 0;
+      font-size: clamp(24px, 4vw, 36px);
+      letter-spacing: .2px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: rgba(115,166,255,.12);
+      border: 1px solid rgba(115,166,255,.25);
+      color: #d8e6ff;
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
+    .hero-copy {
+      display: grid;
+      gap: 14px;
+      min-width: 0;
+    }
+
+    .hero-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .hero-info-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      max-width: 920px;
+    }
+
+    .hero-info-card {
+      padding: 14px 16px;
+      border-radius: 16px;
+      background: rgba(255,255,255,.035);
+      border: 1px solid rgba(255,255,255,.06);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.04);
+    }
+
+    .hero-info-card .k {
+      margin-bottom: 6px;
+      color: #dbe7ff;
+      font-size: 12px;
+      letter-spacing: .15px;
+      text-transform: uppercase;
+    }
+
+    .hero-info-card .v {
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    .mode-box {
+      min-width: 260px;
+      padding: 14px;
+      border-radius: 18px;
+      background: rgba(255,255,255,.04);
+      border: 1px solid rgba(255,255,255,.08);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.05);
+    }
+
+    .mode-box .tiny {
+      margin-top: 8px;
+    }
+
+    .segmented {
+      display: inline-grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      width: 100%;
+    }
+
+    .segmented button {
+      min-height: 44px;
+      border-radius: 14px;
+    }
+
+    .segmented button.active {
+      background: linear-gradient(180deg, rgba(115,166,255,.32), rgba(140,114,255,.18));
+      border-color: rgba(140,114,255,.4);
+      box-shadow: 0 8px 24px rgba(74,106,179,.25);
+    }
+
+    .summary-bar {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    .summary-pill {
+      padding: 14px 16px;
+      border-radius: 18px;
+      background: linear-gradient(180deg, rgba(23,32,66,.92), rgba(16,24,50,.9));
+      border: 1px solid rgba(255,255,255,.08);
+      box-shadow: var(--glow);
+      min-width: 0;
+    }
+
+    .summary-pill .k {
+      color: #bfd0ff;
+      font-size: 12px;
+      margin-bottom: 6px;
+      letter-spacing: .15px;
+    }
+
+    .summary-pill .v {
+      font-size: clamp(20px, 2.6vw, 28px);
+      font-weight: 800;
+      letter-spacing: .2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .summary-pill .s {
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    .grid {
+      display: grid;
+      gap: 16px;
+      grid-template-columns: repeat(12, 1fr);
+    }
+
+    .card {
+      grid-column: span 12;
+      background: linear-gradient(180deg, var(--panel), var(--panel-2));
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .card-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      padding: 16px 18px;
+      border-bottom: 1px solid rgba(255,255,255,.08);
+      background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,0));
+    }
+
+    .card-head h2 {
+      margin: 0;
+      font-size: 18px;
+    }
+
+    .sub {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .card-body {
+      padding: 18px;
+    }
+
+    .fields {
+      display: grid;
+      gap: 14px;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    label {
+      color: #dbe5ff;
+      font-size: 13px;
+    }
+
+    .label-row {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    input, select, button, textarea {
+      font: inherit;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: rgba(8,12,27,.62);
+      color: var(--text);
+      min-height: 44px;
+      padding: 10px 12px;
+      outline: none;
+      transition: .16s ease;
+      width: 100%;
+      min-width: 0;
+    }
+
+    input:focus, select:focus, textarea:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 4px rgba(115,166,255,.12);
+    }
+
+    input[readonly] {
+      opacity: .95;
+    }
+
+    button {
+      cursor: pointer;
+      font-weight: 600;
+      background: linear-gradient(180deg, rgba(115,166,255,.2), rgba(115,166,255,.12));
+    }
+
+    button:hover { transform: translateY(-1px); }
+    button.secondary { background: rgba(255,255,255,.04); }
+    button.good { background: linear-gradient(180deg, rgba(103,216,154,.22), rgba(103,216,154,.12)); }
+    button.warn { background: linear-gradient(180deg, rgba(255,182,92,.22), rgba(255,182,92,.12)); }
+    button.danger { background: linear-gradient(180deg, rgba(255,123,123,.22), rgba(255,123,123,.12)); }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .quick-panel {
+      padding: 14px;
+      border-radius: 18px;
+      background: rgba(255,255,255,.035);
+      border: 1px solid rgba(255,255,255,.06);
+      margin-bottom: 16px;
+    }
+
+    .quick-title {
+      font-size: 13px;
+      color: #dce7ff;
+      margin-bottom: 10px;
+    }
+
+    .toggle-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: 10px;
+    }
+
+    .toggle-chip {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-height: 48px;
+      padding: 10px 12px;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,.08);
+      background: rgba(9,14,30,.55);
+      user-select: none;
+      cursor: pointer;
+      min-width: 0;
+    }
+
+    .toggle-chip input {
+      width: 18px;
+      height: 18px;
+      min-height: auto;
+      margin: 0;
+      padding: 0;
+      accent-color: #86aeff;
+      flex: 0 0 auto;
+    }
+
+    .toggle-chip span {
+      min-width: 0;
+      font-size: 13px;
+      color: #e5ecff;
+    }
+
+    .toggle-chip small {
+      display: block;
+      color: var(--muted);
+      margin-top: 2px;
+      font-size: 11px;
+      line-height: 1.35;
+    }
+
+    .quick-inline {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .quick-inline select {
+      width: 96px;
+      min-width: 96px;
+      padding-right: 8px;
+    }
+
+    .effective-line {
+      margin-top: 12px;
+      padding: 12px 14px;
+      border-radius: 14px;
+      background: rgba(115,166,255,.08);
+      border: 1px solid rgba(115,166,255,.18);
+      color: #dce7ff;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .advanced-group {
+      padding-top: 4px;
+    }
+
+    .advanced-note {
+      margin-bottom: 12px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .source-list {
+      display: grid;
+      gap: 12px;
+    }
+
+    .source-row {
+      display: grid;
+      gap: 12px;
+      grid-template-columns: 1.15fr 1fr auto;
+      align-items: end;
+      padding: 12px;
+      border-radius: 16px;
+      background: rgba(255,255,255,.03);
+      border: 1px solid rgba(255,255,255,.06);
+    }
+
+    .source-inline {
+      display: grid;
+      gap: 12px;
+      grid-template-columns: 1fr 1fr;
+    }
+
+    .icon-btn {
+      width: 46px;
+      min-width: 46px;
+      height: 46px;
+      padding: 0;
+      font-size: 18px;
+    }
+
+    .note {
+      padding: 14px 16px;
+      border-left: 4px solid var(--accent);
+      background: rgba(115,166,255,.08);
+      border-radius: 12px;
+      color: #dce8ff;
+      line-height: 1.5;
+    }
+
+    .tiny {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .presets {
+      display: grid;
+      gap: 12px;
+      grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+      align-items: end;
+    }
+
+    .presets > .field {
+      min-width: 0;
+    }
+
+    .preset-actions {
+      grid-column: 1 / -1;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .preset-actions button {
+      flex: 1 1 160px;
+      min-width: 0;
+    }
+
+    .results {
+      display: grid;
+      grid-template-columns: 1.15fr repeat(4, minmax(0, 1fr));
+      gap: 14px;
+      align-items: stretch;
+    }
+
+    .result {
+      padding: 16px;
+      border-radius: 16px;
+      background: rgba(255,255,255,.04);
+      border: 1px solid rgba(255,255,255,.06);
+      min-width: 0;
+    }
+
+    .result.hero-result {
+      background:
+        radial-gradient(circle at top left, rgba(115,166,255,.24), transparent 48%),
+        linear-gradient(180deg, rgba(28,39,84,.95), rgba(18,26,54,.95));
+      border: 1px solid rgba(115,166,255,.22);
+      box-shadow: var(--glow);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .result.hero-result::after {
+      content: '';
+      position: absolute;
+      inset: auto -60px -70px auto;
+      width: 180px;
+      height: 180px;
+      background: radial-gradient(circle, rgba(140,114,255,.18), transparent 68%);
+      pointer-events: none;
+    }
+
+    .result .k {
+      color: var(--muted);
+      font-size: 12px;
+      margin-bottom: 8px;
+    }
+
+    .result .v {
+      font-size: clamp(22px, 3vw, 30px);
+      font-weight: 800;
+      letter-spacing: .2px;
+      min-width: 0;
+      overflow-wrap: anywhere;
+    }
+
+    .result.hero-result .v {
+      font-size: clamp(28px, 4vw, 40px);
+    }
+
+    .hero-subline {
+      margin-top: 12px;
+      color: #d6e4ff;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .formula {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 13px;
+      line-height: 1.5;
+      color: #d8e6ff;
+      padding: 12px 14px;
+      border-radius: 14px;
+      background: rgba(6,10,22,.55);
+      border: 1px solid rgba(255,255,255,.06);
+      overflow-x: auto;
+      white-space: pre-wrap;
+    }
+
+    .footer-note {
+      margin-top: 16px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    .hide-basic {
+      display: none !important;
+    }
+
+    .tip {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 18px;
+      height: 18px;
+      border-radius: 999px;
+      background: rgba(115,166,255,.16);
+      border: 1px solid rgba(115,166,255,.28);
+      color: #dce7ff;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: help;
+      flex: 0 0 auto;
+    }
+
+    .tip .tip-box {
+      position: absolute;
+      left: 50%;
+      top: calc(100% + 8px);
+      transform: translateX(-50%);
+      width: min(250px, 70vw);
+      padding: 10px 12px;
+      border-radius: 12px;
+      background: rgba(10,15,31,.97);
+      border: 1px solid rgba(255,255,255,.08);
+      box-shadow: 0 14px 32px rgba(0,0,0,.35);
+      color: #edf2ff;
+      font-size: 12px;
+      line-height: 1.45;
+      opacity: 0;
+      pointer-events: none;
+      transition: .15s ease;
+      z-index: 10;
+      text-align: left;
+    }
+
+    .tip:hover .tip-box,
+    .tip:focus-within .tip-box {
+      opacity: 1;
+    }
+
+    [data-mode="basic"] .advanced-only {
+      display: none !important;
+    }
+
+    @media (min-width: 860px) {
+      .span-6 { grid-column: span 6; }
+      .span-7 { grid-column: span 7; }
+      .span-5 { grid-column: span 5; }
+      .span-4 { grid-column: span 4; }
+      .span-8 { grid-column: span 8; }
+      .span-12 { grid-column: span 12; }
+    }
+
+    @media (max-width: 1180px) {
+      .summary-bar {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .results {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .result.hero-result {
+        grid-column: 1 / -1;
+      }
+    }
+
+    @media (max-width: 860px) {
+      .source-row, .source-inline, .presets {
+        grid-template-columns: 1fr;
+      }
+      .preset-actions {
+        grid-column: 1;
+      }
+      .icon-btn { width: 100%; min-width: 0; }
+      .hero-top { flex-direction: column; }
+      .hero-info-grid { grid-template-columns: 1fr; }
+      .mode-box { width: 100%; }
+    }
+
+    @media (max-width: 680px) {
+      .summary-bar {
+        grid-template-columns: 1fr;
+      }
+      .results, .fields {
+        grid-template-columns: 1fr;
+      }
+      .toggle-grid {
+        grid-template-columns: 1fr;
+      }
+      .quick-inline {
+        flex-wrap: wrap;
+      }
+      .quick-inline select {
+        width: 100%;
+        min-width: 0;
+      }
+    }
+  </style>
+</head>
+<body data-mode="basic">
+  <div class="wrap">
+    <section class="hero">
+      <div class="hero-top">
+        <div class="hero-copy">
+          <div class="hero-title">
+            <h1>RAID — offline damage calculator</h1>
+          </div>
+
+          <div class="hero-badges">
+            <span class="badge">Offline mode</span>
+            <span class="badge">Hybrid coefficient support</span>
+            <span class="badge">Local parameter storage</span>
+          </div>
+
+          <div class="hero-info-grid">
+            <div class="hero-info-card">
+              <div class="k">Operating modes</div>
+              <div class="v"><b>Basic</b> mode is intended for quick calculations. <b>Advanced</b> mode opens all available fields, including manual modifiers and the calculation formula.</div>
+            </div>
+            <div class="hero-info-card">
+              <div class="k">Hybrid skills</div>
+              <div class="v">Skills that scale from several parameters, for example <b>ATK + HP</b>, are calculated as the sum of separate damage sources.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="mode-box">
+          <div class="quick-title">Interface mode</div>
+          <div class="segmented">
+            <button id="modeBasic" type="button" class="active">Basic</button>
+            <button id="modeAdvanced" type="button" class="secondary">Advanced</button>
+          </div>
+          <div class="tiny">Basic mode hides additional parameters. Advanced mode shows all available fields, including manual modifiers and the calculation formula.</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="summary-bar">
+      <div class="summary-pill">
+        <div class="k">Crit per hit</div>
+        <div class="v" id="topCrit">—</div>
+        <div class="s">Damage of one hit assuming a guaranteed critical strike.</div>
+      </div>
+      <div class="summary-pill">
+        <div class="k">Average per hit</div>
+        <div class="v" id="topAvg">—</div>
+        <div class="s">Including crit rate and crit damage.</div>
+      </div>
+      <div class="summary-pill">
+        <div class="k">Average across all hits</div>
+        <div class="v" id="topTotal">—</div>
+        <div class="s">Total for skills with multiple hits.</div>
+      </div>
+      <div class="summary-pill">
+        <div class="k">DEF multiplier</div>
+        <div class="v" id="topDefMult">—</div>
+        <div class="s" id="topDefText">—</div>
+      </div>
+    </section>
+
+    <div class="grid">
+      <section class="card span-6">
+        <div class="card-head">
+          <div>
+            <h2>1) Hero and target stats</h2>
+            <div class="sub">Main parameters affecting skill calculation</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="fields">
+            <div class="field">
+              <label class="label-row" for="atk">Hero ATK
+                <span class="tip">?<span class="tip-box">Base ATK before quick toggles and manual bonuses are applied. If you enter the final in-game value, do not enable extra buffs.</span></span>
+              </label>
+              <input id="atk" type="number" min="0" step="1" value="4500" />
+            </div>
+            <div class="field">
+              <label class="label-row" for="def">Hero DEF
+                <span class="tip">?<span class="tip-box">Used for skills that scale from DEF. If the skill does not scale from DEF, this field can be left unchanged.</span></span>
+              </label>
+              <input id="def" type="number" min="0" step="1" value="2500" />
+            </div>
+            <div class="field">
+              <label class="label-row" for="hp">Hero HP
+                <span class="tip">?<span class="tip-box">Used for skills that scale from hero HP. For hybrid skills, add a separate row with an HP source.</span></span>
+              </label>
+              <input id="hp" type="number" min="0" step="1" value="65000" />
+            </div>
+            <div class="field">
+              <label class="label-row" for="enemyHp">Target MAX HP
+                <span class="tip">?<span class="tip-box">Required only for skills that scale from the target’s MAX HP. Otherwise, this field can be left unchanged.</span></span>
+              </label>
+              <input id="enemyHp" type="number" min="0" step="1" value="100000" />
+            </div>
+            <div class="field">
+              <label class="label-row" for="enemyDef">Target DEF
+                <span class="tip">?<span class="tip-box">Base target DEF before Decrease DEF and Ignore DEF are applied. The final DEF multiplier is calculated from this value.</span></span>
+              </label>
+              <input id="enemyDef" type="number" min="0" step="1" value="3000" />
+            </div>
+            <div class="field">
+              <label class="label-row" for="hits">Number of hits
+                <span class="tip">?<span class="tip-box">Number of separate hits of the skill. Total average damage is calculated as average damage per hit multiplied by this value.</span></span>
+              </label>
+              <input id="hits" type="number" min="1" step="1" value="1" />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card span-6">
+        <div class="card-head">
+          <div>
+            <h2>2) Buffs, crits, and modifiers</h2>
+            <div class="sub">Quick toggles for common conditions and manual fields for precise tuning</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="quick-panel">
+            <div class="quick-title">Quick toggles</div>
+            <div class="toggle-grid">
+              <label class="toggle-chip">
+                <input id="quickAtk50" type="checkbox" />
+                <span>+50% ATK<small>Increase ATK</small></span>
+              </label>
+
+              <label class="toggle-chip">
+                <input id="quickDef60" type="checkbox" />
+                <span>+60% DEF<small>Increase DEF</small></span>
+              </label>
+
+              <label class="toggle-chip">
+                <input id="quickHp50" type="checkbox" />
+                <span>+50% HP<small>Increase HP</small></span>
+              </label>
+
+              <label class="toggle-chip">
+                <input id="quickDecDef60" type="checkbox" checked />
+                <span>-60% Target DEF<small>Decrease DEF</small></span>
+              </label>
+
+              <label class="toggle-chip">
+                <input id="quickWeaken25" type="checkbox" checked />
+                <span>Weaken 25%<small>Standard target debuff</small></span>
+              </label>
+
+              <label class="toggle-chip">
+                <div class="quick-inline">
+                  <input id="quickIgnoreToggle" type="checkbox" />
+                  <span>Ignore DEF</span>
+                  <select id="quickIgnorePreset">
+                    <option value="25">25%</option>
+                    <option value="50">50%</option>
+                    <option value="100">100%</option>
+                  </select>
+                </div>
+              </label>
+            </div>
+
+            <div id="effectiveBonuses" class="effective-line">—</div>
+          </div>
+
+          <div class="fields">
+            <div class="field">
+              <label class="label-row" for="critrate">Crit rate, %
+                <span class="tip">?<span class="tip-box">Used only for average damage. Crit damage per hit is calculated as if a crit has already occurred.</span></span>
+              </label>
+              <input id="critrate" type="number" min="0" max="100" step="0.1" value="100" />
+            </div>
+            <div class="field">
+              <label class="label-row" for="critdmg">Crit damage, %
+                <span class="tip">?<span class="tip-box">For example, a value of 250 corresponds to a ×3.5 critical multiplier: base damage + 250%.</span></span>
+              </label>
+              <input id="critdmg" type="number" min="0" step="0.1" value="250" />
+            </div>
+          </div>
+
+          <div class="advanced-group advanced-only">
+            <div class="advanced-note">The fields below are added on top of the quick toggle values. They can be used at the same time.</div>
+            <div class="fields">
+              <div class="field">
+                <label class="label-row" for="atkBuff">Extra ATK bonus, %
+                  <span class="tip">?<span class="tip-box">Used for custom or total bonuses that are not covered by the quick toggles.</span></span>
+                </label>
+                <input id="atkBuff" type="number" step="0.1" value="0" />
+              </div>
+              <div class="field">
+                <label class="label-row" for="defBuff">Extra DEF bonus, %
+                  <span class="tip">?<span class="tip-box">Works the same way as the ATK bonus. Used for manual tuning.</span></span>
+                </label>
+                <input id="defBuff" type="number" step="0.1" value="0" />
+              </div>
+              <div class="field">
+                <label class="label-row" for="hpBuff">Extra HP bonus, %
+                  <span class="tip">?<span class="tip-box">Used for HP-based skills when you need to add a custom bonus manually.</span></span>
+                </label>
+                <input id="hpBuff" type="number" step="0.1" value="0" />
+              </div>
+              <div class="field">
+                <label class="label-row" for="books">Skill books bonus, %
+                  <span class="tip">?<span class="tip-box">For example, if books grant +10% skill damage, enter 10. This is a separate multiplier.</span></span>
+                </label>
+                <input id="books" type="number" step="0.1" value="0" />
+              </div>
+              <div class="field">
+                <label class="label-row" for="otherDmg">General damage bonus, %
+                  <span class="tip">?<span class="tip-box">Used to account for the total of other damage-increasing sources.</span></span>
+                </label>
+                <input id="otherDmg" type="number" step="0.1" value="0" />
+              </div>
+              <div class="field">
+                <label class="label-row" for="finalMult">Other final multiplier, %
+                  <span class="tip">?<span class="tip-box">Used for final modifiers. Unlike a regular damage bonus, it is applied as a separate multiplier.</span></span>
+                </label>
+                <input id="finalMult" type="number" step="0.1" value="0" />
+              </div>
+              <div class="field">
+                <label class="label-row" for="decDef">Extra Decrease DEF, %
+                  <span class="tip">?<span class="tip-box">Additional value on top of the quick toggle. For example, if -60% is enabled and 5 is entered here, the final value becomes 65%.</span></span>
+                </label>
+                <input id="decDef" type="number" min="0" max="100" step="0.1" value="0" />
+              </div>
+              <div class="field">
+                <label class="label-row" for="ignoreDef">Extra Ignore DEF, %
+                  <span class="tip">?<span class="tip-box">Additional Ignore DEF on top of the Ignore DEF quick toggle.</span></span>
+                </label>
+                <input id="ignoreDef" type="number" min="0" max="100" step="0.1" value="0" />
+              </div>
+              <div class="field">
+                <label class="label-row" for="weaken">Extra Weaken, %
+                  <span class="tip">?<span class="tip-box">Additional target damage bonus on top of the Weaken 25% quick toggle.</span></span>
+                </label>
+                <input id="weaken" type="number" min="0" step="0.1" value="0" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card span-7">
+        <div class="card-head">
+          <div>
+            <h2>3) Skill damage sources</h2>
+            <div class="sub">Add multiple rows if the skill is calculated from several parameters at once</div>
+          </div>
+          <div class="toolbar">
+            <button id="addSource" type="button">+ Add source</button>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="note" style="margin-bottom: 14px;">
+            Hybrid skill example: one row with <b>ATK</b> and its coefficient, a second row with <b>HP</b> and its coefficient. Total damage is calculated as the sum of all rows.
+          </div>
+          <div id="sourceList" class="source-list"></div>
+        </div>
+      </section>
+
+      <section class="card span-5">
+        <div class="card-head">
+          <div>
+            <h2>4) Presets</h2>
+            <div class="sub">Stored locally in the browser on the current device</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="presets">
+            <div class="field">
+              <label for="presetName">Preset name</label>
+              <input id="presetName" type="text" placeholder="Example: Skill 2 / Arena" />
+            </div>
+            <div class="field">
+              <label for="presetSelect">Saved presets</label>
+              <select id="presetSelect"></select>
+            </div>
+            <div class="preset-actions">
+              <button id="savePreset" type="button" class="good">Save</button>
+              <button id="loadPreset" type="button" class="secondary">Load</button>
+              <button id="deletePreset" type="button" class="danger">Delete</button>
+            </div>
+          </div>
+          <div class="toolbar" style="margin-top: 12px;">
+            <button id="exportJson" type="button" class="warn">Export JSON</button>
+            <button id="importJsonBtn" type="button" class="secondary">Import JSON</button>
+            <button id="resetAll" type="button" class="secondary">Reset</button>
+            <input id="importJson" type="file" accept="application/json" style="display:none" />
+          </div>
+          <div class="footer-note">Presets let you quickly switch between several skills, builds, or buff sets.</div>
+        </div>
+      </section>
+
+      <section class="card span-12">
+        <div class="card-head">
+          <div>
+            <h2>5) Result</h2>
+            <div class="sub">The main metric is average damage across all hits. The other values help verify the calculation structure.</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="results">
+            <div class="result hero-result">
+              <div class="k">Main result</div>
+              <div class="v" id="outTotal">—</div>
+              <div class="hero-subline" id="resultNarrative">—</div>
+            </div>
+
+            <div class="result">
+              <div class="k">Sum of scaling before modifiers</div>
+              <div class="v" id="outBase">—</div>
+            </div>
+            <div class="result">
+              <div class="k">Non-crit damage per hit</div>
+              <div class="v" id="outNonCrit">—</div>
+            </div>
+            <div class="result">
+              <div class="k">Crit damage per hit</div>
+              <div class="v" id="outCrit">—</div>
+            </div>
+            <div class="result">
+              <div class="k">Effective target DEF</div>
+              <div class="v" id="outEffDef">—</div>
+            </div>
+          </div>
+
+          <div class="advanced-only" style="height: 14px;"></div>
+
+          <div class="fields advanced-only" style="grid-template-columns: 1fr 1fr;">
+            <div class="field">
+              <label>Calculation formula</label>
+              <div class="formula" id="formulaBox"></div>
+            </div>
+            <div class="field">
+              <label>Notes</label>
+              <div class="formula" id="notesBox"></div>
+            </div>
+          </div>
+
+          <div class="footer-note">
+            The calculator does not model every in-game exception: weak and strong affinity hits, certain unique passive effects, restrictions on some skills, and part of specific PvP/PvE scenarios. For most practical calculations, the current model is sufficient.
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <template id="sourceTemplate">
+    <div class="source-row">
+      <div class="source-inline">
+        <div class="field">
+          <label>Parameter</label>
+          <select class="src-type">
+            <option value="atk">Hero ATK</option>
+            <option value="def">Hero DEF</option>
+            <option value="hp">Hero HP</option>
+            <option value="enemyHp">Target MAX HP</option>
+            <option value="flat">Flat value</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Coefficient</label>
+          <input class="src-coef" type="number" step="0.0001" value="1" />
+        </div>
+      </div>
+      <div class="field">
+        <label>This row contribution</label>
+        <input class="src-preview" type="text" value="0" readonly />
+      </div>
+      <button type="button" class="icon-btn danger remove-source" title="Remove row">✕</button>
+    </div>
+  </template>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+
+    const els = {
+      atk: $('atk'),
+      def: $('def'),
+      hp: $('hp'),
+      enemyHp: $('enemyHp'),
+      enemyDef: $('enemyDef'),
+      hits: $('hits'),
+
+      critrate: $('critrate'),
+      critdmg: $('critdmg'),
+      atkBuff: $('atkBuff'),
+      defBuff: $('defBuff'),
+      hpBuff: $('hpBuff'),
+      books: $('books'),
+      otherDmg: $('otherDmg'),
+      finalMult: $('finalMult'),
+      decDef: $('decDef'),
+      ignoreDef: $('ignoreDef'),
+      weaken: $('weaken'),
+
+      quickAtk50: $('quickAtk50'),
+      quickDef60: $('quickDef60'),
+      quickHp50: $('quickHp50'),
+      quickDecDef60: $('quickDecDef60'),
+      quickWeaken25: $('quickWeaken25'),
+      quickIgnoreToggle: $('quickIgnoreToggle'),
+      quickIgnorePreset: $('quickIgnorePreset'),
+      effectiveBonuses: $('effectiveBonuses'),
+
+      modeBasic: $('modeBasic'),
+      modeAdvanced: $('modeAdvanced'),
+
+      addSource: $('addSource'),
+      sourceList: $('sourceList'),
+
+      presetName: $('presetName'),
+      presetSelect: $('presetSelect'),
+      savePreset: $('savePreset'),
+      loadPreset: $('loadPreset'),
+      deletePreset: $('deletePreset'),
+      exportJson: $('exportJson'),
+      importJsonBtn: $('importJsonBtn'),
+      importJson: $('importJson'),
+      resetAll: $('resetAll'),
+
+      outBase: $('outBase'),
+      outNonCrit: $('outNonCrit'),
+      outCrit: $('outCrit'),
+      outEffDef: $('outEffDef'),
+      outTotal: $('outTotal'),
+      resultNarrative: $('resultNarrative'),
+      formulaBox: $('formulaBox'),
+      notesBox: $('notesBox'),
+
+      topCrit: $('topCrit'),
+      topAvg: $('topAvg'),
+      topTotal: $('topTotal'),
+      topDefMult: $('topDefMult'),
+      topDefText: $('topDefText')
+    };
+
+    const template = $('sourceTemplate');
+    const STORAGE_KEY = 'raid_damage_calculator_presets_v2';
+    let currentMode = 'basic';
+
+    function num(v) {
+      const n = Number(v);
+      return Number.isFinite(n) ? n : 0;
+    }
+
+    function pct(v) {
+      return num(v) / 100;
+    }
+
+    function clamp(v, min, max) {
+      return Math.min(max, Math.max(min, v));
+    }
+
+    function fmt(n, digits = 2) {
+      if (!Number.isFinite(n)) return '—';
+      return new Intl.NumberFormat('ru-RU', {
+        maximumFractionDigits: digits,
+        minimumFractionDigits: 0
+      }).format(n);
+    }
+
+    function modeButtonState() {
+      els.modeBasic.classList.toggle('active', currentMode === 'basic');
+      els.modeAdvanced.classList.toggle('active', currentMode === 'advanced');
+      els.modeBasic.classList.toggle('secondary', currentMode !== 'basic');
+      els.modeAdvanced.classList.toggle('secondary', currentMode !== 'advanced');
+      document.body.setAttribute('data-mode', currentMode);
+    }
+
+    function setMode(mode) {
+      currentMode = mode === 'advanced' ? 'advanced' : 'basic';
+      modeButtonState();
+    }
+
+    function getQuickBonuses() {
+      return {
+        atkBuff: els.quickAtk50.checked ? 50 : 0,
+        defBuff: els.quickDef60.checked ? 60 : 0,
+        hpBuff: els.quickHp50.checked ? 50 : 0,
+        decDef: els.quickDecDef60.checked ? 60 : 0,
+        weaken: els.quickWeaken25.checked ? 25 : 0,
+        ignoreDef: els.quickIgnoreToggle.checked ? num(els.quickIgnorePreset.value) : 0
+      };
+    }
+
+    function getCombinedModifiers() {
+      const quick = getQuickBonuses();
+      return {
+        atkBuff: quick.atkBuff + num(els.atkBuff.value),
+        defBuff: quick.defBuff + num(els.defBuff.value),
+        hpBuff: quick.hpBuff + num(els.hpBuff.value),
+        decDef: quick.decDef + num(els.decDef.value),
+        ignoreDef: quick.ignoreDef + num(els.ignoreDef.value),
+        weaken: quick.weaken + num(els.weaken.value),
+        books: num(els.books.value),
+        otherDmg: num(els.otherDmg.value),
+        finalMult: num(els.finalMult.value)
+      };
+    }
+
+    function getBuffedStats(mods) {
+      return {
+        atk: num(els.atk.value) * (1 + pct(mods.atkBuff)),
+        def: num(els.def.value) * (1 + pct(mods.defBuff)),
+        hp: num(els.hp.value) * (1 + pct(mods.hpBuff)),
+        enemyHp: num(els.enemyHp.value)
+      };
+    }
+
+    function getSourceRows() {
+      return [...els.sourceList.querySelectorAll('.source-row')].map(row => ({
+        row,
+        type: row.querySelector('.src-type').value,
+        coef: num(row.querySelector('.src-coef').value),
+        preview: row.querySelector('.src-preview')
+      }));
+    }
+
+    function baseValueByType(type, stats) {
+      switch (type) {
+        case 'atk': return stats.atk;
+        case 'def': return stats.def;
+        case 'hp': return stats.hp;
+        case 'enemyHp': return stats.enemyHp;
+        case 'flat': return 1;
+        default: return 0;
+      }
+    }
+
+    function typeLabel(type) {
+      return ({
+        atk: 'ATK',
+        def: 'DEF',
+        hp: 'HP',
+        enemyHp: 'Enemy MAX HP',
+        flat: 'Flat'
+      })[type] || type;
+    }
+
+    function defenseMultiplier(effectiveDef) {
+      return 1 - 0.85 * (1 - Math.exp(-Math.max(0, effectiveDef) / 1500));
+    }
+
+    function sourceSummary(rows, stats) {
+      if (!rows.length) return '0';
+      return rows.map(r => {
+        const base = baseValueByType(r.type, stats);
+        return r.type === 'flat'
+          ? fmt(r.coef, 4)
+          : `${typeLabel(r.type)}(${fmt(base, 2)}) × ${fmt(r.coef, 4)}`;
+      }).join(' + ');
+    }
+
+    function updateEffectiveLine(mods) {
+      const pieces = [
+        `Total ATK bonus: ${fmt(mods.atkBuff, 1)}%`,
+        `DEF: ${fmt(mods.defBuff, 1)}%`,
+        `HP: ${fmt(mods.hpBuff, 1)}%`,
+        `Decrease DEF: ${fmt(mods.decDef, 1)}%`,
+        `Weaken: ${fmt(mods.weaken, 1)}%`,
+        `Ignore DEF: ${fmt(mods.ignoreDef, 1)}%`
+      ];
+      els.effectiveBonuses.textContent = pieces.join(' · ');
+    }
+
+    function calculate() {
+      const mods = getCombinedModifiers();
+      updateEffectiveLine(mods);
+
+      const stats = getBuffedStats(mods);
+      const rows = getSourceRows();
+
+      let baseScalingSum = 0;
+      rows.forEach(r => {
+        const base = baseValueByType(r.type, stats);
+        const part = r.type === 'flat' ? r.coef : base * r.coef;
+        baseScalingSum += part;
+        r.preview.value = fmt(part, 4);
+      });
+
+      const booksMult = 1 + pct(mods.books);
+      const dmgMult = 1 + pct(mods.otherDmg);
+      const finalMult = 1 + pct(mods.finalMult);
+      const weakenMult = 1 + pct(mods.weaken);
+
+      const effectiveDecDef = clamp(mods.decDef, 0, 100);
+      const effectiveIgnoreDef = clamp(mods.ignoreDef, 0, 100);
+      const effectiveDef = Math.max(0, num(els.enemyDef.value) * (1 - effectiveDecDef / 100) * (1 - effectiveIgnoreDef / 100));
+      const defMult = defenseMultiplier(effectiveDef);
+
+      const nonCrit = baseScalingSum * booksMult * dmgMult * finalMult * weakenMult * defMult;
+      const critMultiplier = 1 + pct(els.critdmg.value);
+      const crit = nonCrit * critMultiplier;
+      const critRate = clamp(pct(els.critrate.value), 0, 1);
+      const avg = nonCrit * (1 + critRate * pct(els.critdmg.value));
+      const hits = Math.max(1, Math.floor(num(els.hits.value) || 1));
+      const total = avg * hits;
+
+      els.outBase.textContent = fmt(baseScalingSum, 2);
+      els.outNonCrit.textContent = fmt(nonCrit, 2);
+      els.outCrit.textContent = fmt(crit, 2);
+      els.outEffDef.textContent = fmt(effectiveDef, 2);
+      els.outTotal.textContent = fmt(total, 2);
+
+      els.topCrit.textContent = fmt(crit, 2);
+      els.topAvg.textContent = fmt(avg, 2);
+      els.topTotal.textContent = fmt(total, 2);
+      els.topDefMult.textContent = `${fmt(defMult, 4)}x`;
+      els.topDefText.textContent = `Effective DEF: ${fmt(effectiveDef, 2)} · Hits: ${hits}`;
+
+      els.resultNarrative.textContent =
+        `Average damage per hit: ${fmt(avg, 2)} · Crit per hit: ${fmt(crit, 2)} · Hits: ${hits}`;
+
+      els.formulaBox.textContent = [
+        `Base = ${sourceSummary(rows, stats)}`,
+        `NonCrit = Base × ${fmt(booksMult, 4)} × ${fmt(dmgMult, 4)} × ${fmt(finalMult, 4)} × ${fmt(weakenMult, 4)} × DEF_Mult(${fmt(effectiveDef, 2)})`,
+        `Crit = NonCrit × ${fmt(critMultiplier, 4)}`,
+        `Average = NonCrit × (1 + CritRate × C.DMG)`,
+        `Total = Average × Hits`
+      ].join('\n');
+
+      els.notesBox.textContent = [
+        `Buffed stats: ATK ${fmt(stats.atk, 2)}, DEF ${fmt(stats.def, 2)}, HP ${fmt(stats.hp, 2)}.`,
+        `Final percentages: ATK +${fmt(mods.atkBuff, 1)}%, DEF +${fmt(mods.defBuff, 1)}%, HP +${fmt(mods.hpBuff, 1)}%, Decrease DEF ${fmt(effectiveDecDef, 1)}%, Weaken ${fmt(mods.weaken, 1)}%, Ignore DEF ${fmt(effectiveIgnoreDef, 1)}%.`,
+        `Effective target DEF = target DEF × (1 - Decrease DEF) × (1 - Ignore DEF).`,
+        `For hybrid skills, the final base is calculated as the sum of all source rows.`
+      ].join('\n\n');
+    }
+
+    function addSourceRow(data = {}) {
+      const node = template.content.firstElementChild.cloneNode(true);
+      node.querySelector('.src-type').value = data.type || 'atk';
+      node.querySelector('.src-coef').value = data.coef ?? 1;
+
+      node.querySelector('.remove-source').addEventListener('click', () => {
+        if (els.sourceList.children.length > 1) {
+          node.remove();
+          calculate();
+        }
+      });
+
+      node.querySelectorAll('select, input').forEach(el => el.addEventListener('input', calculate));
+      els.sourceList.appendChild(node);
+      calculate();
+    }
+
+    function getState() {
+      return {
+        mode: currentMode,
+        values: {
+          atk: els.atk.value,
+          def: els.def.value,
+          hp: els.hp.value,
+          enemyHp: els.enemyHp.value,
+          enemyDef: els.enemyDef.value,
+          hits: els.hits.value,
+          critrate: els.critrate.value,
+          critdmg: els.critdmg.value,
+          atkBuff: els.atkBuff.value,
+          defBuff: els.defBuff.value,
+          hpBuff: els.hpBuff.value,
+          books: els.books.value,
+          otherDmg: els.otherDmg.value,
+          finalMult: els.finalMult.value,
+          decDef: els.decDef.value,
+          ignoreDef: els.ignoreDef.value,
+          weaken: els.weaken.value
+        },
+        quick: {
+          quickAtk50: els.quickAtk50.checked,
+          quickDef60: els.quickDef60.checked,
+          quickHp50: els.quickHp50.checked,
+          quickDecDef60: els.quickDecDef60.checked,
+          quickWeaken25: els.quickWeaken25.checked,
+          quickIgnoreToggle: els.quickIgnoreToggle.checked,
+          quickIgnorePreset: els.quickIgnorePreset.value
+        },
+        sources: getSourceRows().map(r => ({ type: r.type, coef: r.coef }))
+      };
+    }
+
+    function applyState(state) {
+      if (!state) return;
+      const values = state.values || {};
+      for (const [key, value] of Object.entries(values)) {
+        if (els[key]) els[key].value = value;
+      }
+
+      const quick = state.quick || {};
+      for (const [key, value] of Object.entries(quick)) {
+        if (!els[key]) continue;
+        if (els[key].type === 'checkbox') els[key].checked = Boolean(value);
+        else els[key].value = value;
+      }
+
+      setMode(state.mode || 'basic');
+
+      els.sourceList.innerHTML = '';
+      const sources = Array.isArray(state.sources) && state.sources.length
+        ? state.sources
+        : [{ type: 'atk', coef: 1 }];
+      sources.forEach(s => addSourceRow(s));
+
+      calculate();
+    }
+
+    function getPresets() {
+      try {
+        return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+      } catch {
+        return {};
+      }
+    }
+
+    function setPresets(presets) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(presets));
+      refreshPresetSelect();
+    }
+
+    function refreshPresetSelect() {
+      const presets = getPresets();
+      const names = Object.keys(presets).sort((a, b) => a.localeCompare(b, 'ru'));
+      els.presetSelect.innerHTML = names.length
+        ? names.map(name => `<option value="${name.replace(/"/g, '&quot;')}">${name}</option>`).join('')
+        : '<option value="">No saved presets</option>';
+    }
+
+    function bindInputs(ids) {
+      ids.forEach(id => els[id].addEventListener('input', calculate));
+    }
+
+    els.modeBasic.addEventListener('click', () => {
+      setMode('basic');
+      calculate();
+    });
+
+    els.modeAdvanced.addEventListener('click', () => {
+      setMode('advanced');
+      calculate();
+    });
+
+    els.addSource.addEventListener('click', () => addSourceRow());
+
+    bindInputs([
+      'atk','def','hp','enemyHp','enemyDef','hits','critrate','critdmg',
+      'atkBuff','defBuff','hpBuff','books','otherDmg','finalMult','decDef','ignoreDef','weaken',
+      'quickIgnorePreset'
+    ]);
+
+    [
+      'quickAtk50','quickDef60','quickHp50','quickDecDef60','quickWeaken25','quickIgnoreToggle'
+    ].forEach(id => els[id].addEventListener('change', calculate));
+
+    els.savePreset.addEventListener('click', () => {
+      const name = els.presetName.value.trim();
+      if (!name) {
+        alert('Enter a preset name.');
+        return;
+      }
+      const presets = getPresets();
+      presets[name] = getState();
+      setPresets(presets);
+      els.presetSelect.value = name;
+    });
+
+    els.loadPreset.addEventListener('click', () => {
+      const name = els.presetSelect.value;
+      const presets = getPresets();
+      if (!name || !presets[name]) return;
+      applyState(presets[name]);
+      els.presetName.value = name;
+    });
+
+    els.deletePreset.addEventListener('click', () => {
+      const name = els.presetSelect.value;
+      const presets = getPresets();
+      if (!name || !presets[name]) return;
+      delete presets[name];
+      setPresets(presets);
+    });
+
+    els.exportJson.addEventListener('click', () => {
+      const blob = new Blob([JSON.stringify(getState(), null, 2)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'raid-calculator-preset.json';
+      a.click();
+      URL.revokeObjectURL(a.href);
+    });
+
+    els.importJsonBtn.addEventListener('click', () => els.importJson.click());
+
+    els.importJson.addEventListener('change', async (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      try {
+        const text = await file.text();
+        const data = JSON.parse(text);
+        applyState(data);
+      } catch (err) {
+        alert('Failed to import the JSON file.');
+      } finally {
+        e.target.value = '';
+      }
+    });
+
+    els.resetAll.addEventListener('click', () => {
+      applyState({
+        mode: 'basic',
+        values: {
+          atk: 4500,
+          def: 2500,
+          hp: 65000,
+          enemyHp: 100000,
+          enemyDef: 3000,
+          hits: 1,
+          critrate: 100,
+          critdmg: 250,
+          atkBuff: 0,
+          defBuff: 0,
+          hpBuff: 0,
+          books: 0,
+          otherDmg: 0,
+          finalMult: 0,
+          decDef: 0,
+          ignoreDef: 0,
+          weaken: 0
+        },
+        quick: {
+          quickAtk50: false,
+          quickDef60: false,
+          quickHp50: false,
+          quickDecDef60: true,
+          quickWeaken25: true,
+          quickIgnoreToggle: false,
+          quickIgnorePreset: '25'
+        },
+        sources: [{ type: 'atk', coef: 1 }]
+      });
+      els.presetName.value = '';
+    });
+
+    refreshPresetSelect();
+    setMode('basic');
+    addSourceRow({ type: 'atk', coef: 1 });
+    calculate();
+  </script>
+</body>
+</html>
